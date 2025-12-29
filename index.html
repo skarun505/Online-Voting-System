@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Referral System - Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <style>
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-md);
+        }
+
+        .auth-card {
+            max-width: 450px;
+            width: 100%;
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: var(--spacing-sm);
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .auth-tab.active {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .link-text {
+            color: var(--primary-light);
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .link-text:hover {
+            text-decoration: underline;
+        }
+
+        .referral-info {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid var(--primary-color);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+            font-size: 0.875rem;
+        }
+
+        .icon {
+            font-size: 3rem;
+            margin-bottom: var(--spacing-sm);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="glass-card auth-card">
+            <div class="auth-header">
+                <div class="icon">🌐</div>
+                <h1>Referral System</h1>
+                <p class="text-muted">Join and grow your network</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchTab('login')">Login</button>
+                <button class="auth-tab" onclick="switchTab('register')">Register</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form active" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" class="form-input" placeholder="Enter your username" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required>
+                </div>
+
+                <div id="loginMessage"></div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <span>Login</span>
+                </button>
+
+                <p class="text-center mt-2 text-muted">
+                    Don't have an account? <a class="link-text" onclick="switchTab('register')">Register here</a>
+                </p>
+            </form>
+
+            <!-- Registration Form -->
+            <form id="registerForm" class="auth-form" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label class="form-label" for="regUsername">Username</label>
+                    <input type="text" id="regUsername" class="form-input" placeholder="Choose a username" required minlength="3">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="regEmail">Email</label>
+                    <input type="email" id="regEmail" class="form-input" placeholder="Enter your email" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="regPassword">Password</label>
+                    <input type="password" id="regPassword" class="form-input" placeholder="Create a password" required minlength="6">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="regReferralCode">Referral Code (Optional)</label>
+                    <input type="text" id="regReferralCode" class="form-input" placeholder="Enter referral code if you have one" maxlength="8">
+                    <div class="referral-info">
+                        💡 If you were referred by someone, enter their code to get started!
+                    </div>
+                </div>
+
+                <div id="registerMessage"></div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <span>Create Account</span>
+                </button>
+
+                <p class="text-center mt-2 text-muted">
+                    Already have an account? <a class="link-text" onclick="switchTab('login')">Login here</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/referral-system.js"></script>
+    <script>
+        let authManager;
+        let referralSystem;
+
+        // Initialize the application
+        async function initApp() {
+            try {
+                await storage.init();
+                authManager = new AuthManager(storage);
+                referralSystem = new ReferralSystem(storage);
+                
+                // Make referralSystem globally available
+                window.referralSystem = referralSystem;
+
+                // Check if already logged in
+                if (authManager.isLoggedIn()) {
+                    redirectToDashboard();
+                }
+
+                // Check for demo mode
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('demo') === 'true') {
+                    await createDemoData();
+                }
+            } catch (error) {
+                console.error('Failed to initialize app:', error);
+                showMessage('loginMessage', 'Failed to initialize application. Please refresh the page.', 'error');
+            }
+        }
+
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.auth-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update forms
+            document.querySelectorAll('.auth-form').forEach(form => {
+                form.classList.remove('active');
+            });
+
+            if (tab === 'login') {
+                document.getElementById('loginForm').classList.add('active');
+            } else {
+                document.getElementById('registerForm').classList.add('active');
+            }
+
+            // Clear messages
+            clearMessages();
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            clearMessages();
+
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const result = await authManager.login(username, password);
+
+            if (result.success) {
+                showMessage('loginMessage', 'Login successful! Redirecting...', 'success');
+                setTimeout(() => redirectToDashboard(), 1000);
+            } else {
+                showMessage('loginMessage', result.error, 'error');
+            }
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+            clearMessages();
+
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const referralCode = document.getElementById('regReferralCode').value.trim();
+
+            const result = await authManager.register(username, email, password, referralCode);
+
+            if (result.success) {
+                showMessage('registerMessage', 'Account created successfully! Redirecting...', 'success');
+                setTimeout(() => redirectToDashboard(), 1500);
+            } else {
+                showMessage('registerMessage', result.error, 'error');
+            }
+        }
+
+        function redirectToDashboard() {
+            if (authManager.isAdmin()) {
+                window.location.href = 'admin-dashboard.html';
+            } else {
+                window.location.href = 'user-dashboard.html';
+            }
+        }
+
+        function showMessage(elementId, message, type) {
+            const messageDiv = document.getElementById(elementId);
+            messageDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        }
+
+        function clearMessages() {
+            document.getElementById('loginMessage').innerHTML = '';
+            document.getElementById('registerMessage').innerHTML = '';
+        }
+
+        // Demo data creation
+        async function createDemoData() {
+            const users = await storage.getAllUsers();
+            if (users.length > 0) return; // Already has data
+
+            // Create admin
+            await authManager.createAdminUser('admin', 'admin@example.com', 'admin123');
+
+            // Create sample users in a tree structure
+            const sampleUsers = [
+                { username: 'john', email: 'john@example.com', password: 'pass123', referredBy: null },
+                { username: 'sarah', email: 'sarah@example.com', password: 'pass123', referredBy: null },
+                { username: 'mike', email: 'mike@example.com', password: 'pass123', referredBy: null },
+            ];
+
+            for (const user of sampleUsers) {
+                await authManager.register(user.username, user.email, user.password, user.referredBy);
+            }
+
+            // Get codes for creating referral chain
+            const john = await storage.getUserByUsername('john');
+            const sarah = await storage.getUserByUsername('sarah');
+            const mike = await storage.getUserByUsername('mike');
+
+            // Level 2
+            await authManager.register('alice', 'alice@example.com', 'pass123', john.referralCode);
+            await authManager.register('bob', 'bob@example.com', 'pass123', john.referralCode);
+            await authManager.register('carol', 'carol@example.com', 'pass123', sarah.referralCode);
+
+            // Level 3
+            const alice = await storage.getUserByUsername('alice');
+            const bob = await storage.getUserByUsername('bob');
+            await authManager.register('david', 'david@example.com', 'pass123', alice.referralCode);
+            await authManager.register('emma', 'emma@example.com', 'pass123', bob.referralCode);
+
+            // Level 4
+            const david = await storage.getUserByUsername('david');
+            await authManager.register('frank', 'frank@example.com', 'pass123', david.referralCode);
+
+            console.log('Demo data created!');
+        }
+
+        // Initialize on page load
+        initApp();
+    </script>
+</body>
+</html>

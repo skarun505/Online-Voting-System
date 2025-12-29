@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Referral System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <style>
+        .action-buttons {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-lg);
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container navbar-content">
+            <a href="#" class="navbar-brand">🌐 Referral System - Admin</a>
+            <div class="navbar-menu">
+                <span class="navbar-link">👤 <span id="adminName">Admin</span></span>
+                <button class="btn btn-outline" onclick="handleLogout()">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: var(--spacing-lg); padding-bottom: var(--spacing-xl);">
+
+        <!-- Welcome Section -->
+        <div class="text-center mb-3">
+            <h1>Admin Dashboard</h1>
+            <p class="text-muted">System-wide analytics and user management</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button class="btn btn-primary" onclick="refreshDashboard()">
+                🔄 Refresh Data
+            </button>
+            <button class="btn btn-secondary" onclick="exportAllData()">
+                📥 Export Data
+            </button>
+            <button class="btn btn-outline" onclick="clearAllData()">
+                🗑️ Clear All Data
+            </button>
+        </div>
+
+        <!-- System Stats -->
+        <div class="grid grid-4 mb-3">
+            <div class="stat-card">
+                <div class="stat-value" id="totalUsers">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalReferrals">0</div>
+                <div class="stat-label">Total Referrals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalEarnings">₹0</div>
+                <div class="stat-label">Total Earnings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgEarnings">₹0</div>
+                <div class="stat-label">Avg Per User</div>
+            </div>
+        </div>
+
+        <!-- Earnings Distribution -->
+        <div class="glass-card mb-3">
+            <h3 class="mb-2">💰 Earnings Distribution by Level</h3>
+            <div class="grid grid-2">
+                <div class="earnings-item">
+                    <div>
+                        <span class="level-badge level-1">Level 1</span>
+                        <p class="text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">Direct referrals</p>
+                    </div>
+                    <div class="earnings-amount" id="level1Total">₹0</div>
+                </div>
+                <div class="earnings-item">
+                    <div>
+                        <span class="level-badge level-2">Level 2</span>
+                        <p class="text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">2nd level referrals</p>
+                    </div>
+                    <div class="earnings-amount" id="level2Total">₹0</div>
+                </div>
+                <div class="earnings-item">
+                    <div>
+                        <span class="level-badge level-3">Level 3</span>
+                        <p class="text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">3rd level referrals</p>
+                    </div>
+                    <div class="earnings-amount" id="level3Total">₹0</div>
+                </div>
+                <div class="earnings-item">
+                    <div>
+                        <span class="level-badge level-4plus">Level 4+</span>
+                        <p class="text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">4th level and beyond
+                        </p>
+                    </div>
+                    <div class="earnings-amount" id="level4PlusTotal">₹0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Earners -->
+        <div class="glass-card mb-3">
+            <h3 class="mb-2">🏆 Top Earners</h3>
+            <div id="topEarners" class="table-container">
+                <!-- Table will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- User Search -->
+        <div class="glass-card mb-3">
+            <h3 class="mb-2">🔍 User Management</h3>
+            <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="userSearch"
+                    placeholder="Search users by username, email, or referral code..." oninput="filterUsers()">
+            </div>
+            <div id="usersList" class="table-container">
+                <!-- Table will be populated by JavaScript -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- User Details Modal -->
+    <div id="userModal" class="modal hidden" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="modalUserName">User Details</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalContent">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/referral-system.js"></script>
+    <script>
+        let authManager;
+        let referralSystem;
+        let currentUser;
+        let allUsers = [];
+
+        async function initDashboard() {
+            try {
+                await storage.init();
+                authManager = new AuthManager(storage);
+                referralSystem = new ReferralSystem(storage);
+
+                // Check if logged in and admin
+                if (!authManager.isLoggedIn()) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                currentUser = await authManager.getCurrentUser();
+                if (!currentUser || !currentUser.isAdmin) {
+                    window.location.href = 'user-dashboard.html';
+                    return;
+                }
+
+                document.getElementById('adminName').textContent = currentUser.username;
+                await loadDashboard();
+
+            } catch (error) {
+                console.error('Failed to initialize dashboard:', error);
+                alert('Failed to load dashboard. Please try again.');
+            }
+        }
+
+        async function loadDashboard() {
+            // Get system stats
+            const stats = await referralSystem.getSystemStats();
+
+            // Display stats
+            document.getElementById('totalUsers').textContent = stats.totalUsers;
+            document.getElementById('totalReferrals').textContent = stats.totalReferrals;
+            document.getElementById('totalEarnings').textContent = `₹${stats.totalEarnings.toLocaleString()}`;
+
+            const avgEarnings = stats.totalUsers > 0 ? Math.round(stats.totalEarnings / stats.totalUsers) : 0;
+            document.getElementById('avgEarnings').textContent = `₹${avgEarnings.toLocaleString()}`;
+
+            // Display earnings by level
+            document.getElementById('level1Total').textContent = `₹${stats.earningsByLevel.level1.toLocaleString()}`;
+            document.getElementById('level2Total').textContent = `₹${stats.earningsByLevel.level2.toLocaleString()}`;
+            document.getElementById('level3Total').textContent = `₹${stats.earningsByLevel.level3.toLocaleString()}`;
+            document.getElementById('level4PlusTotal').textContent = `₹${stats.earningsByLevel.level4Plus.toLocaleString()}`;
+
+            // Display top earners
+            renderTopEarners(stats.topEarners);
+
+            // Load all users
+            allUsers = await storage.getAllUsers();
+            renderUsersList(allUsers);
+        }
+
+        function renderTopEarners(topEarners) {
+            const container = document.getElementById('topEarners');
+
+            if (topEarners.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>No earnings data yet.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Username</th>
+                            <th>Referral Code</th>
+                            <th>Total Earnings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            topEarners.forEach((user, index) => {
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+                tableHTML += `
+                    <tr>
+                        <td>${medal}</td>
+                        <td><strong>${user.username}</strong></td>
+                        <td><code>${user.referralCode}</code></td>
+                        <td style="color: var(--success-color); font-weight: 600;">₹${user.totalEarnings.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            container.innerHTML = tableHTML;
+        }
+
+        function renderUsersList(users) {
+            const container = document.getElementById('usersList');
+
+            if (users.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>No users found.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Referral Code</th>
+                            <th>Referred By</th>
+                            <th>Total Earnings</th>
+                            <th>Admin</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            users.forEach(user => {
+                tableHTML += `
+                    <tr>
+                        <td><strong>${user.username}</strong></td>
+                        <td>${user.email}</td>
+                        <td><code>${user.referralCode}</code></td>
+                        <td>${user.referredBy || '-'}</td>
+                        <td style="color: var(--success-color); font-weight: 600;">₹${user.totalEarnings.toLocaleString()}</td>
+                        <td>${user.isAdmin ? '✅' : '❌'}</td>
+                        <td>
+                            <button class="btn btn-outline btn-icon" onclick="viewUserDetails('${user.id}')" title="View Details">
+                                👁️
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            container.innerHTML = tableHTML;
+        }
+
+        function filterUsers() {
+            const searchTerm = document.getElementById('userSearch').value.toLowerCase();
+
+            if (!searchTerm) {
+                renderUsersList(allUsers);
+                return;
+            }
+
+            const filtered = allUsers.filter(user =>
+                user.username.toLowerCase().includes(searchTerm) ||
+                user.email.toLowerCase().includes(searchTerm) ||
+                user.referralCode.toLowerCase().includes(searchTerm)
+            );
+
+            renderUsersList(filtered);
+        }
+
+        async function viewUserDetails(userId) {
+            const user = await storage.getUserById(userId);
+            if (!user) return;
+
+            const stats = await referralSystem.getReferralStats(userId);
+            const directReferrals = await referralSystem.getDirectReferrals(userId);
+            const upline = await referralSystem.getUpline(userId);
+
+            let modalHTML = `
+                <div style="margin-bottom: var(--spacing-md);">
+                    <p><strong>Username:</strong> ${user.username}</p>
+                    <p><strong>Email:</strong> ${user.email}</p>
+                    <p><strong>Referral Code:</strong> <code>${user.referralCode}</code></p>
+                    <p><strong>Referred By:</strong> ${user.referredBy || 'None (Root User)'}</p>
+                    <p><strong>Joined:</strong> ${new Date(user.createdAt).toLocaleString()}</p>
+                    <p><strong>Admin:</strong> ${user.isAdmin ? 'Yes' : 'No'}</p>
+                </div>
+
+                <h4>Earnings Breakdown</h4>
+                <div class="grid grid-2" style="margin-bottom: var(--spacing-md);">
+                    <div class="earnings-item">
+                        <span class="level-badge level-1">Level 1</span>
+                        <div class="earnings-amount">₹${user.earningsByLevel.level1}</div>
+                    </div>
+                    <div class="earnings-item">
+                        <span class="level-badge level-2">Level 2</span>
+                        <div class="earnings-amount">₹${user.earningsByLevel.level2}</div>
+                    </div>
+                    <div class="earnings-item">
+                        <span class="level-badge level-3">Level 3</span>
+                        <div class="earnings-amount">₹${user.earningsByLevel.level3}</div>
+                    </div>
+                    <div class="earnings-item">
+                        <span class="level-badge level-4plus">Level 4+</span>
+                        <div class="earnings-amount">₹${user.earningsByLevel.level4Plus}</div>
+                    </div>
+                </div>
+
+                <h4>Network Statistics</h4>
+                <div style="margin-bottom: var(--spacing-md);">
+                    <p><strong>Direct Referrals:</strong> ${stats ? stats.directReferrals : 0}</p>
+                    <p><strong>Total Network:</strong> ${stats ? stats.totalReferrals : 0}</p>
+                    <p><strong>Network Depth:</strong> ${stats && stats.levels ? Object.keys(stats.levels).length : 0} levels</p>
+                </div>
+
+                ${directReferrals.length > 0 ? `
+                    <h4>Direct Referrals</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        ${directReferrals.map(ref => `<li>• ${ref.username} (${ref.referralCode})</li>`).join('')}
+                    </ul>
+                ` : ''}
+
+                ${upline.length > 0 ? `
+                    <h4>Upline Chain</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        ${upline.map((ref, idx) => `<li>Level ${idx + 1}: ${ref.username} (${ref.referralCode})</li>`).join('')}
+                    </ul>
+                ` : ''}
+            `;
+
+            document.getElementById('modalUserName').textContent = `${user.username} - Details`;
+            document.getElementById('modalContent').innerHTML = modalHTML;
+            document.getElementById('userModal').classList.remove('hidden');
+        }
+
+        function closeModal(event) {
+            const modal = document.getElementById('userModal');
+            modal.classList.add('hidden');
+        }
+
+        async function refreshDashboard() {
+            await loadDashboard();
+            alert('Dashboard refreshed!');
+        }
+
+        async function exportAllData() {
+            const data = await storage.exportData();
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `referral-system-backup-${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function clearAllData() {
+            if (!confirm('⚠️ WARNING: This will delete ALL users and referral data. This action cannot be undone. Are you absolutely sure?')) {
+                return;
+            }
+
+            if (!confirm('This is your final warning. All data will be permanently deleted. Continue?')) {
+                return;
+            }
+
+            await storage.clearAllData();
+            alert('All data has been cleared.');
+            window.location.reload();
+        }
+
+        function handleLogout() {
+            authManager.logout();
+        }
+
+        // Initialize on page load
+        initDashboard();
+    </script>
+</body>
+
+</html>

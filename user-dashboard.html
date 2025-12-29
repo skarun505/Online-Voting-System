@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard - Referral System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container navbar-content">
+            <a href="#" class="navbar-brand">🌐 Referral System</a>
+            <div class="navbar-menu">
+                <span class="navbar-link" id="userDisplayName">Loading...</span>
+                <button class="btn btn-outline" onclick="handleLogout()">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: var(--spacing-lg); padding-bottom: var(--spacing-xl);">
+
+        <!-- Welcome Section -->
+        <div class="text-center mb-3">
+            <h1>Welcome, <span id="userName"></span>!</h1>
+            <p class="text-muted">Manage your referral network and track your earnings</p>
+        </div>
+
+        <!-- Referral Code Display -->
+        <div class="glass-card referral-code-display mb-3">
+            <p class="text-muted mb-1">Your Unique Referral Code</p>
+            <div class="referral-code" id="referralCode">LOADING...</div>
+            <button class="btn btn-secondary copy-button" onclick="copyReferralCode()">
+                📋 Copy Code
+            </button>
+            <button class="btn btn-outline mt-1" onclick="shareReferralLink()">
+                🔗 Share Link
+            </button>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-4 mb-3">
+            <div class="stat-card">
+                <div class="stat-value" id="totalEarnings">₹0</div>
+                <div class="stat-label">Total Earnings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="directReferrals">0</div>
+                <div class="stat-label">Direct Referrals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalReferrals">0</div>
+                <div class="stat-label">Total Network</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="networkLevels">0</div>
+                <div class="stat-label">Network Depth</div>
+            </div>
+        </div>
+
+        <!-- Earnings Breakdown -->
+        <div class="glass-card mb-3">
+            <h3 class="mb-2">💰 Earnings by Level</h3>
+            <div class="grid grid-2">
+                <div class="earnings-item">
+                    <div>
+                        <span class="level-badge level-1">Level 1</span>
+                        <p class="text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">Direct referrals (₹100
+                            each)</p>
+                    </div>
+                    <div class="earnings-amount" id="level1Earnings">₹0</div>
+                </div>
+                <div class="earnings-item">
+                    <div>
+                        <span class="level-badge level-2">Level 2</span>
+                        <p class="text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">2nd level referrals
+                            (₹60 each)</p>
+                    </div>
+                    <div class="earnings-amount" id="level2Earnings">₹0</div>
+                </div>
+                <div class="earnings-item">
+                    <div>
+                        <span class="level-badge level-3">Level 3</span>
+                        <p class="text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">3rd level referrals
+                            (₹40 each)</p>
+                    </div>
+                    <div class="earnings-amount" id="level3Earnings">₹0</div>
+                </div>
+                <div class="earnings-item">
+                    <div>
+                        <span class="level-badge level-4plus">Level 4+</span>
+                        <p class="text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">4th level+ (₹20 each)
+                        </p>
+                    </div>
+                    <div class="earnings-amount" id="level4PlusEarnings">₹0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Referral Tree Visualization -->
+        <div class="glass-card mb-3">
+            <div class="flex-between mb-2">
+                <h3>🌳 Your Referral Network</h3>
+                <button class="btn btn-outline" onclick="toggleTreeView()">
+                    <span id="treeToggleText">Show Tree</span>
+                </button>
+            </div>
+            <div id="treeVisualization" class="hidden" style="overflow-x: auto;">
+                <div id="treeContent"></div>
+            </div>
+        </div>
+
+        <!-- Recent Referrals -->
+        <div class="glass-card">
+            <h3 class="mb-2">📊 Recent Referrals & Earnings</h3>
+            <div id="recentReferrals" class="table-container">
+                <!-- Table will be populated by JavaScript -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Copy Feedback Toast -->
+    <div id="copyFeedback" class="hidden"></div>
+
+    <!-- Scripts -->
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/referral-system.js"></script>
+    <script>
+        let authManager;
+        let referralSystem;
+        let currentUser;
+        let treeVisible = false;
+
+        async function initDashboard() {
+            try {
+                await storage.init();
+                authManager = new AuthManager(storage);
+                referralSystem = new ReferralSystem(storage);
+
+                // Check if logged in
+                if (!authManager.isLoggedIn()) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Get current user
+                currentUser = await authManager.getCurrentUser();
+                if (!currentUser) {
+                    authManager.logout();
+                    return;
+                }
+
+                // Load dashboard data
+                await loadDashboard();
+
+            } catch (error) {
+                console.error('Failed to initialize dashboard:', error);
+                alert('Failed to load dashboard. Please try again.');
+            }
+        }
+
+        async function loadDashboard() {
+            // Display user info
+            document.getElementById('userName').textContent = currentUser.username;
+            document.getElementById('userDisplayName').textContent = currentUser.username;
+            document.getElementById('referralCode').textContent = currentUser.referralCode;
+
+            // Display total earnings
+            document.getElementById('totalEarnings').textContent = `₹${currentUser.totalEarnings.toLocaleString()}`;
+
+            // Display earnings by level
+            document.getElementById('level1Earnings').textContent = `₹${currentUser.earningsByLevel.level1.toLocaleString()}`;
+            document.getElementById('level2Earnings').textContent = `₹${currentUser.earningsByLevel.level2.toLocaleString()}`;
+            document.getElementById('level3Earnings').textContent = `₹${currentUser.earningsByLevel.level3.toLocaleString()}`;
+            document.getElementById('level4PlusEarnings').textContent = `₹${currentUser.earningsByLevel.level4Plus.toLocaleString()}`;
+
+            // Get referral stats
+            const stats = await referralSystem.getReferralStats(currentUser.id);
+            if (stats) {
+                document.getElementById('directReferrals').textContent = stats.directReferrals;
+                document.getElementById('totalReferrals').textContent = stats.totalReferrals;
+                document.getElementById('networkLevels').textContent = Object.keys(stats.levels).length;
+            }
+
+            // Load recent referrals
+            await loadRecentReferrals();
+        }
+
+        async function loadRecentReferrals() {
+            const breakdown = await referralSystem.getEarningsBreakdown(currentUser.id);
+            const container = document.getElementById('recentReferrals');
+
+            if (breakdown.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>No referrals yet. Share your referral code to start earning!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Level</th>
+                            <th>Earnings</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            breakdown.forEach(item => {
+                const date = new Date(item.date).toLocaleDateString();
+                const levelClass = item.level === 1 ? 'level-1' :
+                    item.level === 2 ? 'level-2' :
+                        item.level === 3 ? 'level-3' : 'level-4plus';
+
+                tableHTML += `
+                    <tr>
+                        <td><strong>${item.referredUser.username}</strong></td>
+                        <td><span class="level-badge ${levelClass}">Level ${item.level}</span></td>
+                        <td style="color: var(--success-color); font-weight: 600;">₹${item.earnings}</td>
+                        <td>${date}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            container.innerHTML = tableHTML;
+        }
+
+        async function toggleTreeView() {
+            treeVisible = !treeVisible;
+            const treeDiv = document.getElementById('treeVisualization');
+            const toggleText = document.getElementById('treeToggleText');
+
+            if (treeVisible) {
+                treeDiv.classList.remove('hidden');
+                toggleText.textContent = 'Hide Tree';
+                await renderTree();
+            } else {
+                treeDiv.classList.add('hidden');
+                toggleText.textContent = 'Show Tree';
+            }
+        }
+
+        async function renderTree() {
+            const tree = await referralSystem.buildReferralTree(currentUser.id);
+            const container = document.getElementById('treeContent');
+
+            if (!tree || tree.children.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Your referral tree is empty. Start referring users!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = renderTreeNode(tree, 0);
+        }
+
+        function renderTreeNode(node, level) {
+            if (level === 0) {
+                // Root node (current user)
+                let html = `<div style="text-align: center; margin: 2rem 0;">`;
+                html += `<div class="tree-node-content" style="display: inline-block; background: rgba(99, 102, 241, 0.2);">`;
+                html += `<div class="tree-node-name">You</div>`;
+                html += `<div class="tree-node-earnings">Total: ₹${node.user.totalEarnings}</div>`;
+                html += `</div>`;
+
+                if (node.children.length > 0) {
+                    html += `<div style="margin-top: 2rem; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">`;
+                    node.children.forEach(child => {
+                        html += renderTreeNode(child, level + 1);
+                    });
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
+                return html;
+            } else {
+                const levelClass = level === 1 ? 'level-1' :
+                    level === 2 ? 'level-2' :
+                        level === 3 ? 'level-3' : 'level-4plus';
+
+                let html = `<div class="tree-node" style="display: inline-block; vertical-align: top;">`;
+                html += `<div class="tree-node-content">`;
+                html += `<div class="tree-node-name">${node.user.username}</div>`;
+                html += `<div class="tree-node-level"><span class="level-badge ${levelClass}">L${level}</span></div>`;
+                html += `</div>`;
+
+                if (node.children.length > 0) {
+                    html += `<div style="margin-top: 1rem; margin-left: 1rem;">`;
+                    node.children.forEach(child => {
+                        html += renderTreeNode(child, level + 1);
+                    });
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
+                return html;
+            }
+        }
+
+        function copyReferralCode() {
+            const code = currentUser.referralCode;
+            navigator.clipboard.writeText(code).then(() => {
+                showCopyFeedback('Referral code copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+
+        function shareReferralLink() {
+            const link = `${window.location.origin}/index.html?ref=${currentUser.referralCode}`;
+            navigator.clipboard.writeText(link).then(() => {
+                showCopyFeedback('Referral link copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+
+        function showCopyFeedback(message) {
+            const feedback = document.getElementById('copyFeedback');
+            feedback.textContent = message;
+            feedback.classList.remove('hidden');
+            feedback.classList.add('copy-feedback');
+
+            setTimeout(() => {
+                feedback.classList.add('hidden');
+                feedback.classList.remove('copy-feedback');
+            }, 3000);
+        }
+
+        function handleLogout() {
+            authManager.logout();
+        }
+
+        // Initialize on page load
+        initDashboard();
+    </script>
+</body>
+
+</html>
